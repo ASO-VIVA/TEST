@@ -8,168 +8,231 @@ import time
 from collections import Counter
 from utils.error_handler import safe_execute
 
-
 # 役職一覧
 ROLE_DATA = {
     "villager":{
         "name": "村人",             # 日本語役職名
-        "team": "human",            # 陣営
+        "team": "人間",            # 陣営
         "selected_score" : 0,       # 選択役職に付随する得点（能力得点）
         "confirmed_score" : 0,      # 確定役職に付随する得点
         "night_action": None,       # 夜能力 # none:なし # target:対象セレクト # agent:工作員専用
         "night_message": "村人は、夜の行動は特にありません。", # 夜のメッセージ
-        "order": 0,                 # 夜処理順
+        "points":{                  # 確定役職でのポイント
+            "alive_points": 0,      # 生存時のポイント
+            "dead_points": -1,      # 死亡時のポイント
+            "vote_monster": 1,      # 投票でモンスターを処刑成功
+        },
         "is_expansion": False,      # 拡張役職
     },
     "werewolf":{
         "name": "人狼",
-        "team": "monster",
+        "team": "モンスター",
         "selected_score" : 0,
         "confirmed_score" : 0,
         "night_action": None,
         "night_message": "人狼は、夜の行動は特にありません。",
-        "order": 0,
+        "points": {
+            "alive_points": 3,
+            "dead_points": -1,
+            "vote_monster": 0,
+        },
         "is_expansion": False,
     },
     "seer":{
         "name": "占い師",
-        "team": "human",
+        "team": "人間",
         "selected_score" : 0,
         "confirmed_score" : 0,
         "night_action": {"type": "target"},
-        "night_message": "占い師は、占う相手を決めてください。\n占い結果は『人間側』/『モンスター』と出ます。\n※判定結果は**確定役職**の結果です。",
-        "order": 100,
+        "night_message": "占い師は、占う相手を決めてください。\n占い結果は『人間』/『モンスター』/『ペット』と出ます。\n※判定結果は**確定役職**の結果です。",
+        "points": {
+            "alive_points": 0,
+            "dead_points": 0,
+            "vote_monster": 1,
+        },
         "is_expansion": False,
     },
     "hunter":{
         "name": "狩人",
-        "team": "human",
+        "team": "人間",
         "selected_score" : 0,
         "confirmed_score" : 0,
         "night_action": None,
         "night_message": "狩人は、夜の行動は特にありません。\n投票終了後に任意で1人を処刑することができます。",
-        "order": 0,
+        "points": {
+            "alive_points": 0,
+            "dead_points": -1,
+            "vote_monster": 2,
+        },
         "is_expansion": False,
     },
     "death_seeker":{
         "name": "死にたがり",
-        "team": "human",
+        "team": "人間",
         "selected_score" : 0,
         "confirmed_score" : 0,
         "night_action": None,
         "night_message": "死にたがりは、夜の行動は特にありません。",
-        "order": 0,
+        "points": {
+            "alive_points": -1,
+            "dead_points": 3,
+            "vote_monster": 0,
+        },
         "is_expansion": False,
     },
     "phantom_thief":{
         "name": "怪盗",
-        "team": "human",
+        "team": "人間",
         "selected_score" : 0,
         "confirmed_score" : 0,
         "night_action": {"type": "target"},
         "night_message": "怪盗は、**選択役職**を交換する相手決めてください。",
-        "order": 30,
+        "points": {
+            "alive_points": 0,
+            "dead_points": -1,
+            "vote_monster": 1,
+        },
         "is_expansion": False,
     },
     "cleric":{
         "name": "聖職者",
-        "team": "human",
+        "team": "人間",
         "selected_score" : 0,
         "confirmed_score" : 0,
         "night_action": None,
         "night_message": "聖職者は、夜の行動終了時に全員の**確定役職**の中にモンスターが居るかどうかが分かります。\n誰・人数は分かりません。",
-        "order": 100,
+        "points": {
+            "alive_points": 0,
+            "dead_points": 0,
+            "vote_monster": 1,
+        },
         "is_expansion": True,
     },
     "mayor":{
         "name": "村長",
-        "team": "human",
+        "team": "人間",
         "selected_score" : 0,
         "confirmed_score" : 0,
         "night_action": None,
         "night_message": "村長は、夜の行動は特にありません。",
-        "order": 0,
+        "points": {
+            "alive_points": 0,
+            "dead_points": -1,
+            "vote_monster": 1,
+        },
         "is_expansion": True,
     },
     "agent":{
         "name": "工作員",
-        "team": "human",
+        "team": "人間",
         "selected_score" : 0,
         "confirmed_score" : 0,
         "night_action": {"type": "target"},
         "night_message": "工作員は、役職塗り替えを交換する相手決めてください。\n対象選択後、塗り替える役職選択用のボタンが出ます。",
-        "order": 50,
+        "points": {
+            "alive_points": 0,
+            "dead_points": -1,
+            "vote_monster": 1,
+        },
         "is_expansion": True,
     },
     "serial_killer":{
         "name": "殺人鬼",
-        "team": "human",
+        "team": "人間",
         "selected_score" : 0,
         "confirmed_score" : 0,
         "night_action": None,
         "night_message": "殺人鬼は、夜の行動は特にありません。",
-        "order": 0,
+        "points": {
+            "alive_points": 0,
+            "dead_points": -1,
+            "vote_monster": 0,
+        },
         "is_expansion": True,
     },
     "mentalist":{
         "name": "メンタリスト",
-        "team": "human",
+        "team": "人間",
         "selected_score" : 0,
         "confirmed_score" : 0,
         "night_action": {"type": "target"},
         "night_message": "メンタリストは、このラウンドで処刑予告する相手決めてください。",
-        "order": 10,
+        "points": {
+            "alive_points": 0,
+            "dead_points": -1,
+            "vote_monster": 1,
+        },
         "is_expansion": True,
     },
     "devil":{
         "name": "悪魔",
-        "team": "monster",
+        "team": "モンスター",
         "selected_score" : 0,
         "confirmed_score" : 0,
         "night_action": None,
         "night_message": "悪魔は、夜の行動は特にありません。",
-        "order": 0,
+        "points": {
+            "alive_points": -2,
+            "dead_points": -2,
+            "vote_monster": 0,
+        },
         "is_expansion": True,
     },
     "esper":{
         "name": "超能力者",
-        "team": "human",
+        "team": "人間",
         "selected_score" : 0,
         "confirmed_score" : 0,
         "night_action": None,
         "night_message": "超能力者は、夜の行動終了時に使用されている**確定役職**を知ることができます。\n各役職の人数は分かりません。",
-        "order": 100,
+        "points": {
+            "alive_points": 0,
+            "dead_points": -1,
+            "vote_monster": 1,
+        },
         "is_expansion": True,
     },
     "vampire":{
         "name": "吸血鬼",
-        "team": "monster",
+        "team": "モンスター",
         "selected_score" : 0,
         "confirmed_score" : 0,
         "night_action": {"type": "target"},
         "night_message": "吸血鬼は、眷属化する相手決めてください。\n眷属化された相手は、能力や得点方法はそのまま、陣営がモンスターになります。",
-        "order": 80,
+        "points": {
+            "alive_points": 0,
+            "dead_points": -3,
+            "vote_monster": 0,
+        },
         "is_expansion": True,
     },
     #"half_vampire": "半吸血鬼",
     "dog":{
         "name": "犬",
-        "team": "human",
+        "team": "ペット",
         "selected_score" : 0,
         "confirmed_score" : 0,
         "night_action": {"type": "target"},
         "night_message": "犬は、飼い主を決めてください。\n夜の行動終了時に飼い主の確定役職を知ることが出来ます",
-        "order": 100,
+        "points": {
+            "alive_points": 0,
+            "dead_points": -1,
+            "vote_monster": 1,
+        },
         "is_expansion": True,
     },
     "plushie":{
         "name": "ぬいぐるみ",
-        "team": "human",
+        "team": "ペット",
         "selected_score" : 0,
         "confirmed_score" : 0,
         "night_action": {"type": "target"},
         "night_message": "ぬいぐるみは、持ち主を決めてください。",
-        "order": 10,
+        "points": {
+            "alive_points": 0,
+            "dead_points": -1,
+            "vote_monster": 1,
+        },
         "is_expansion": True,
     },
 }
@@ -205,6 +268,7 @@ class ChoosewolfSession:
     def reset_game(self):
         self.total_score = {}           # 総合得点
         self.round_number = 1           # ゲーム回数
+        self.double_player = set()      # 前占い/聖職者 得点2倍
 
     # ゲーム管理
     def reset_round(self):
@@ -219,11 +283,14 @@ class ChoosewolfSession:
         self.mayor_extra_vote = {}      # 村長の追加投票
         self.vampire_target = {}        # 投票の吸血鬼の噛み対象
         self.agent_target_role = {}     # 工作員の指定役職
-        self.night_targets = {}         # 各能力の対象
+        self.ability_targets = {}       # 各能力の対象
+        self.seer_death_seeker = set()  # 占われた死にたがり
         self.night_done = set()         # 夜の行動済判定
         self.vote_done = set()          # 投票済判定
         self.most_votes = set()         # 最多投票対象
+        self.most_votes_monster = False # 投票結果のモンスターの有無
         self.death = set()              # 死
+        self.devil_death = False        # 悪魔の死
         self.round_score = {}           # このラウンドでの得点
         self.message = None             # メッセージ削除用保管
         self.lock = asyncio.Lock()      # 2重進行ロック
@@ -236,11 +303,14 @@ class ChoosewolfSession:
     # team判定（吸血鬼上書き用）
     def get_team(self, user_id):
         if user_id in self.half_vampire:
-            return "monster"
+            return "モンスター"
         role = self.confirmed_roles.get(user_id)
         if role is None:
             return None
-        return ROLE_DATA[role]["team"]
+        team = ROLE_DATA[role]["team"]
+        if team == "ペット":
+            return "人間"
+        return team
     
     # 役職一覧（吸血鬼上書き用）
     def get_role_name(self, user_id):
@@ -256,8 +326,8 @@ class ChoosewolfSession:
         # 1.怪盗の反映
         for thief_player_id in self.players:
             thief_role = self.selected_roles.get(thief_player_id)
-            if thief_role == "phantom_thief" and thief_player_id in self.night_targets:
-                thief_target_id = self.night_targets[thief_player_id]
+            if thief_role == "phantom_thief" and thief_player_id in self.ability_targets:
+                thief_target_id = self.ability_targets[thief_player_id]
                 # 交換：確定役職へ反映
                 self.confirmed_roles[thief_player_id] = self.selected_roles[thief_target_id]
                 self.confirmed_roles[thief_target_id] = self.selected_roles[thief_player_id]
@@ -268,7 +338,7 @@ class ChoosewolfSession:
         for agent_player_id in self.players:
             agent_role = self.selected_roles.get(agent_player_id)
             if agent_role == "agent":
-                agent_target_id = self.night_targets.get(agent_player_id)
+                agent_target_id = self.ability_targets.get(agent_player_id)
                 if agent_target_id is not None:
                     target_count[agent_target_id] = target_count.get(agent_target_id, 0) + 1
 
@@ -283,7 +353,7 @@ class ChoosewolfSession:
         for vampire_player_id in self.players:
             vampire_role = self.selected_roles.get(vampire_player_id)
             if vampire_role == "vampire":
-                vampire_target_id = self.night_targets.get(vampire_player_id)
+                vampire_target_id = self.ability_targets.get(vampire_player_id)
                 vampire_target_role = self.confirmed_roles.get(vampire_target_id)
                 if vampire_target_role == "vampire":
                     self.death.add(vampire_player_id)  # 噛んだ吸血鬼は死亡
@@ -316,23 +386,39 @@ class ChoosewolfSession:
         for user_id in self.players:
             role = self.selected_roles.get(user_id)
             messages = []
-
+            
+            # 占い師の結果
             if role == "seer":
-                target_id = self.night_targets.get(user_id)
+                target_id = self.ability_targets.get(user_id)
                 if target_id is not None:
-                    target_team = self.get_team(target_id)
+                    target_role = self.confirmed_roles.get(target_id)
+                    target_team = ROLE_DATA[target_role]["team"]
                     member = self.guild.get_member(target_id)
-                    messages.append(f"占いの結果： {member.display_name} は {target_team} です。")
+                    messages.append(f"占いの結果\n {member.display_name} は {target_team} です。")
+                    if target_role == "death_seeker":
+                        self.seer_death_seeker.add = target_id
+
+            # 聖職者のお告げ
             elif role == "cleric":
-                has_monster = any(self.get_team(uid) == "monster" for uid in self.players)
-                messages.append(f"聖職者の判定：この中にモンスターは {'存在します' if has_monster else 'いません'}。")
+                has_monster = any(self.get_team(uid) == "モンスター" for uid in self.players)
+                messages.append(f"聖職者はお告げを授かった\nこの中にモンスターは {'存在します' if has_monster else 'いません'}。")
+            
+            # 超能力者の結果
             elif role == "esper":
                 used_role_names = set()
                 for uid in self.confirmed_roles:
                     role_name = self.get_role_name(uid)
                     if role_name:  # None は無視
                         used_role_names.add(role_name)
-                messages.append(f"超能力により使用役職が判明： {', '.join(sorted(used_role_names))}")
+                messages.append(f"超能力により使用されている役職が判明\n{', '.join(sorted(used_role_names))}")
+            
+            # 犬の結果
+            elif role == "dog":
+                owner_id = self.ability_targets.get(user_id)
+                if owner_id is not None:
+                    owner_role = self.confirmed_roles.get(owner_id)
+                    member = self.guild.get_member(owner_id)
+                    messages.append(f"ご主人さまの役職を教えてもらえたワン！\n{member.display_name} は {owner_role} です。")
 
             # DM送信
             if messages:
@@ -463,6 +549,8 @@ class ChoosewolfSession:
                         if count == max_votes:
                             penaltys.append(f"<@{uid}>")
                             self.most_votes.add(uid)
+                    if any(self.get_team(uid) == "モンスター" for uid in self.most_votes):
+                        self.most_votes_monster = True
 
             view = VoteResultView(self, channel)
             msg = await channel.send(
@@ -494,13 +582,135 @@ class ChoosewolfSession:
         )
         await self.message.edit(content=content, view=self)
 
+    # 点数計算式
+    def calculate_player_score(self, user_id):
+        score = 0
+        selected_role = self.selected_roles.get(user_id)
+        confirmed_roles = self.confirmed_roles.get(user_id)
+        target_id = self.ability_targets.get(user_id)
+        team = ROLE_DATA[selected_role]["team"]
+
+        # 選択：ぬいぐるみは通常得点なし
+        if selected_role == "ぬいぐるみ":
+            return 0
+        
+        # =================
+        # 確定役職判定
+        points = ROLE_DATA[confirmed_roles]["points"]
+
+        # 生死得点
+        if user_id in self.death:
+            score += points["dead_points"]
+            # 確定：悪魔で死んだなら反転フラグ
+            if confirmed_roles == "devil":
+                self.devil_death = not self.devil_death
+        else:
+            score += points["alive_points"]
+        
+        # 投票結果ポイント
+        if self.most_votes_monster:
+            score += points["vote_monster"]
+            if selected_role == "mayor":  # 選択：村長能力
+                score += 2
+        # 選択：村長能力失敗
+        elif selected_role == "mayor":
+            score += -2
+
+        # 確定：占われた死にたがり
+        if confirmed_roles == "death_seeker":
+            if user_id in self.seer_death_seeker:
+                    score += -1
+
+        # 確定：殺人鬼の得点
+        elif confirmed_roles == "serial_killer":
+            target_vote_id = self.votes.get(user_id)
+            if target_vote_id in self.most_votes:
+                if self.get_team(target_vote_id) == "モンスター":
+                    score += 3
+                else:
+                    score += -1
+        
+        # 確定：吸血鬼の得点
+        elif confirmed_roles == "vampire":
+            if user_id not in self.death:
+                for servant in self.half_vampire:
+                    if servant not in self.death:
+                        score += 2
+
+        # =================
+        # 選択役職 能力判定        
+        # 選択：狩人能力結果
+        elif selected_role == "hunter":
+            if target_id:
+                if self.get_team(target_id) == "モンスター":
+                    score += 3
+                else:
+                    score += -2
+        
+        # 選択：メンタリスト指定処刑
+        elif selected_role == "mentalist":
+            if target_id in self.most_votes:
+                score += 5
+            else:
+                score += -2
+
+        return score
+
     # 最終結果処理
     async def result_progress(self, channel):
         self.phase = "result"
 
+        # 個人の得点計算
+        self.round_score = {}
 
+        for user_id in self.players:
+            self.round_score[user_id] += self.calculate_player_score(user_id)
 
+        # 選択役職がぬいぐるみの得点計算
+        for user_id in self.players:
+            role = self.selected_roles.get(user_id)
+            team = ROLE_DATA[role]["team"]
+            if team == "ペット":
+                owner = self.ability_targets.get(user_id)
+                if owner is None:
+                    continue # オーナー不在ならスキップ
+                owner_role = self.selected_roles.get(owner)
+                owner_point = self.round_score.get(owner)
+                if ROLE_DATA[owner_role]["team"] == "ペット":
+                    continue # オーナーがペットの場合はスキップ
+                # 選択：ぬいぐるみの能力得点
+                if role == "plushie":              
+                    self.round_score[user_id] = owner_point * 2
+                # 選択：犬の能力得点
+                elif role == "dog":
+                    self.round_score[user_id] += 2 if owner_point > 0 else -2
 
+        # 悪魔の死体数による得点の反転
+        if self.devil_death:
+            for user_id in self.players:
+                self.round_score[user_id] = -self.round_score[user_id]
+        
+        # 前回の2倍反映
+        for user_id in self.players:
+            if user_id in self.double_player:
+                self.round_score[user_id] = self.round_score[user_id] * 2
+        
+        # 前回の2倍リセット
+        self.double_player = {}
+
+        for user_id in self.players:
+            role = self.selected_roles.get(user_id)
+            # 選択：占い師 次2倍
+            if role == "seer":
+                self.double_player.add(user_id)
+
+            # 選択：聖職者 次2倍
+            elif role == "cleric":
+                self.double_player.add(user_id)
+
+        # ラウンド得点を合計得点へ加算
+        for user_id in self.players:
+            self.total_score[user_id] += self.round_score[user_id]
 
         dead = [
             f"<@{uid}>"
@@ -519,7 +729,7 @@ class ChoosewolfSession:
 
         # 専用TCに全員分結果送信
         await self.send_results_to_tc()
-
+    
     # 専用TCへの結果ログ残し
     async def send_results_to_tc(self):
         guild = self.session.bot.get_guild(1049738686767562762)
@@ -555,7 +765,7 @@ class ChoosewolfSession:
         selected_role_name = ROLE_DATA[selected_role]["name"]
 
         # 能力対象
-        role_targets = self.night_targets.get(user_id, "")
+        role_targets = self.ability_targets.get(user_id, "")
         if role_targets:
             role_targets_name = self.guild.get_member(role_targets)
             role_targets_text = f"：能力対象({role_targets_name.display_name if role_targets else str(role_targets)})"
@@ -615,7 +825,7 @@ class ChoosewolfSession:
         selected_role_name = ROLE_DATA[selected_role]["name"]
 
         # 能力対象
-        role_targets = self.night_targets.get(user_id, "")
+        role_targets = self.ability_targets.get(user_id, "")
         role_targets_text = f"：能力対象<@{role_targets}>" if role_targets else ""
 
         # 工作員の指定役職
@@ -793,11 +1003,12 @@ class TimerModal(discord.ui.Modal, title="議論時間を入力してくださ�
 
 # 狩人能力対象セレクト
 class HunterSelect(discord.ui.Select):
-    def __init__(self, session):
+    def __init__(self, session, hunter_id):
         self.session = session
+        self.hunter_id = hunter_id
         options = []
         for user_id in self.session.players:
-            if not self.session.death.get(user_id, False):  # 生存者のみ
+            if user_id not in self.session.death and user_id != self.hunter_id:
                 member = self.session.guild.get_member(user_id)
                 if member:
                     options.append(
@@ -806,10 +1017,18 @@ class HunterSelect(discord.ui.Select):
                             value=str(user_id)
                         )
                     )
-
+        # 選択肢がない場合の placeholder
+        if not options:
+            options.append(discord.SelectOption(
+                label="対象なし",
+                value="none",
+                default=True
+            ))
         
         super().__init__(
-            placeholder="選択してください",
+            placeholder="狩人の能力で処刑する相手を選んでください",
+            min_values=1,
+            max_values=1,
             options=options
         )
 
@@ -820,7 +1039,7 @@ class HunterSelect(discord.ui.Select):
                 item.disabled = True
             await interaction.response.edit_message(view=self.view)
         
-        self.session.selected_roles[interaction.user.id] = self.values[0]
+        self.session.ability_targets[interaction.user.id] = self.values[0]
         self.session.death.add(self.values[0])
 
         await interaction.response.send_message(
@@ -996,7 +1215,7 @@ class NightTargetSelect(discord.ui.Select):
         role = self.session.selected_roles.get(user_id)
         # 能力対象を保存
         target_id = int(self.values[0])
-        self.session.night_targets[user_id] = target_id
+        self.session.ability_targets[user_id] = target_id
 
         # セレクト削除（2重操作無効）
         for item in self.view.children:
@@ -1219,6 +1438,7 @@ class AgentView(ui.View):
         super().__init__(timeout=None)
         self.session = session
         self.available_roles = set(self.session.available_roles)
+        self.available_roles.discard("vampire")
 
         self.agent_role_select_buttons()
 
