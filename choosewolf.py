@@ -795,11 +795,19 @@ class TimerModal(discord.ui.Modal, title="議論時間を入力してくださ�
 class HunterSelect(discord.ui.Select):
     def __init__(self, session):
         self.session = session
-        options = [
-            discord.SelectOption(label=p.user.display_name, value=str(p.id))
-            for p in session.players.values()
-            if not session.death.get(p.id, False)  # 生存者のみ
-        ]
+        options = []
+        for user_id in self.session.players:
+            if not self.session.death.get(user_id, False):  # 生存者のみ
+                member = self.session.guild.get_member(user_id)
+                if member:
+                    options.append(
+                        discord.SelectOption(
+                            label=member.display_name,
+                            value=str(user_id)
+                        )
+                    )
+
+        
         super().__init__(
             placeholder="選択してください",
             options=options
@@ -816,7 +824,7 @@ class HunterSelect(discord.ui.Select):
         self.session.death.add(self.values[0])
 
         await interaction.response.send_message(
-            "<@{self.values[0]}>を撃ちました。",
+            f"<@{self.values[0]}>を撃ちました。",
             ephemeral=True
         )
 
