@@ -211,7 +211,7 @@ class ChoosewolfSession:
         self.guild = None               # ギルド
         self.phase = None               # 現在のフェーズ
         self.owner_id = None            # 送信者
-        self.players = []               # 参加者リスト
+        self.players = set()            # 参加者リスト
         self.selected_roles = {}        # 選択役職
         self.confirmed_roles = {}       # 確定役職
         self.half_vampire = set()       # 半吸血鬼
@@ -563,12 +563,12 @@ class ChoosewolfSession:
             role_targets_text = ""
 
         # 工作員の指定役職
-        agent_role = self.agent_target_role(user_id, "")
+        agent_role = self.agent_target_role.get(user_id, "")
         agent_role_name = ROLE_DATA[agent_role]["name"]
         agent_role_text = f"({agent_role_name})" if agent_role_name else ""
 
         # 吸血鬼の投票の吸血
-        vampire_target = self.vampire_target(user_id, "")
+        vampire_target = self.vampire_target.get(user_id, "")
         if vampire_target:
             vampire_target_name = self.guild.get_member(vampire_target)
             vampire_target_text = f"：吸血({vampire_target_name.display_name if vampire_target else str(vampire_target_name)})"
@@ -584,11 +584,11 @@ class ChoosewolfSession:
         half_vampire_text = "（半吸血鬼）" if half_vampire else ""
 
         # 生存
-        alive = self.alive.get(user_id, True)
-        alive_text = "生存" if alive else "死亡"
+        death = self.death.get(user_id, True)
+        death_text = "死亡" if death else "生存"
 
         return (
-            f"{user_name}：{score}点（{delta}）：{alive_text}"
+            f"{user_name}：{score}点（{delta}）：{death_text}"
             f"\n投票先{vote_text}{vampire_target_text}"
             f"\n選択役職：{selected_role_name}{role_targets_text}{agent_role_text}"
             f" → 確定役職：{confirmed_role_name}{half_vampire_text}"
@@ -619,12 +619,12 @@ class ChoosewolfSession:
         role_targets_text = f"：能力対象<@{role_targets}>" if role_targets else ""
 
         # 工作員の指定役職
-        agent_role = self.agent_target_role(user_id, "")
+        agent_role = self.agent_target_role.get(user_id, "")
         agent_role_name = ROLE_DATA[agent_role]["name"]
         agent_role_text = f"({agent_role_name})" if agent_role_name else ""
 
         # 吸血鬼の投票の吸血
-        vampire_target = self.vampire_target(user_id, "")
+        vampire_target = self.vampire_target.get(user_id, "")
         vampire_target_text = f"：吸血<@{vampire_target}>" if vampire_target else ""
 
         # 確定役職
@@ -636,11 +636,11 @@ class ChoosewolfSession:
         half_vampire_text = "（半吸血鬼）" if half_vampire else ""
 
         # 生存
-        alive = self.alive.get(user_id, True)
-        alive_text = "生存" if alive else "死亡"
+        death = self.death.get(user_id, True)
+        death_text = "死亡" if death else "生存"
 
         return (
-            f"<@{user_id}>：{score}点（{delta}）：{alive_text}"
+            f"<@{user_id}>：{score}点（{delta}）：{death_text}"
             f"\n投票先{vote_text}{vampire_target_text}"
             f"\n選択役職：{selected_role_name}{role_targets_text}{agent_role_text}"
             f" → 確定役職：{confirmed_role_name}{half_vampire_text}"
